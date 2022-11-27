@@ -38,12 +38,11 @@ superbooks <- pull(features, ISBN)
 # Just in case we're curious
 curious <- result[result$ISBN %in% superbooks,]
 
-#Now to build the features function. 
-telist <- list()
-telist <- c(telist, list(superusers))
-telist <- c(telist, list(superbooks))
-teunlist <- unlist(telist, recursive = TRUE)
 
+
+
+
+#Now to build the features function. 
 featselect <- function(superusers, ratings){
   features <- list()
   for (super in superusers){
@@ -66,47 +65,103 @@ featselect <- function(superusers, ratings){
   return (features)
 }
 
-tester <- featselect(superusers[2:3], search)
+features <- featselect(superusers, search)
+
+# Let's write that to a csv
+capture.output(features, file = "features.csv")
+
 
 #Let's see how much these two intersect, I'm pretty happy with this. 85 overlap between collectively 1600 in a pair, fairly distinct.
 #If we wanted we could remove these users...I'll leave them for now. 
-tester2 <- intersect(tester[[1]], tester[[2]])
-
-#Now with these lists of users, we simply need to go one step further, and add their scores to a row, so we have pairs of ISBN and cumulative scores. These will be one step prior to our true features
-for (i in 1:10){
-  print(i)
+for (i in 1:length(features)){
+  base <- features[[i]]
+  for (j in 1:length(features)){
+    if (i < j){
+      reach <- features[[j]]
+      br <- intersect(base, reach)
+      brfinal <- paste("Comparing", i, "with", j, "matches =", length(br), sep = ' ')
+      write(brfinal, file = "similarity.txt", append = TRUE)
+    }
+  write(" ", "similarity.txt", append = TRUE)
+  }
 }
 
-#Take only ISBN and then add 9 columns, one for each feature. 
-level2 <- result %>%
-  select(ISBN) %>%
-  mutate(
-    currentfeat = 0
-  )
 
-level2['currentfeat'][level2['ISBN'] == '0195153448'] <- 24
-find <- level2[level2$ISBN == '0195153448',] %>%
-  pull(currentfeat)
+#Now with these lists of users, we simply need to go one step further, and add their scores to a row, so we have pairs of ISBN and cumulative scores. These will be one step prior to our true features
 
-#level2 <- t(level2)
-#level2[1][1]  <- 1 
-draw <- search %>%
-    filter(User.ID %in% tester[[1]])
+# We'll need a df with a single column that has all items. 
+items <- result %>%
+  select(ISBN)
 
-for (row in 1:nrow(draw)){
+#Let's transform this into a function.
+
+feat2item <- function(features, items, ratings){
+  for (i in seq_along(features)){
+    title <- paste("feature", i, sep = '')
+    items <- items %>%
+      mutate(
+        title = 1
+      )
+  draw <- ratings %>%
+    filter(User.ID %in% feature[[i]])
+  for (row in 1:nrow(draw)){
   cbook <- draw[row,2]
   cscore <-draw[row,3]
   original <- level2[level2$ISBN == cbook,] %>%
-    pull(currentfeat)
-  level2['currentfeat'][level2['ISBN'] == cbook] <- cscore + original
+    pull(title)
+  level2[title][level2['ISBN'] == cbook] <- cscore + original
+    }
   }
+  return (items)
+}
 
-write.csv(level2, file = "initial.csv")
+write.csv(itemfeatures, file = "itemfeatures.csv")
+
+
+
+
 
 #Finally we need to apply this to USER and ITEM, such that every user has each feature score, and every item has each feature score. This will be our true feature matrix.
 
 
 
+```
+### Practice
+These are some aspects of R that I needed to understand in order to succeed on this project
+```{r}
+# lists
+
+#This is just to practice with lists a bit
+  telist <- list()
+  telist <- c(telist, list(superusers))
+  telist <- c(telist, list(superbooks))
+  teunlist <- unlist(telist, recursive = TRUE)
+
+# Modifying elements of a dataframe
+
+  level2['currentfeat'][level2['ISBN'] == '0195153448'] <- 24
+  find <- level2[level2$ISBN == '0195153448',] %>%
+    pull(currentfeat)
+
+#Interacting with pipes and dplyr
+
+  # An example of select and mutate
+  items <- result %>%
+    select(ISBN) %>%
+    mutate(
+      currentfeat = 0
+    )
+
+
+  #An exmaple of filter and %in%
+  draw <- search %>%
+      filter(User.ID %in% tester[[1]])
+  
+#Using the intersect function
+  crosscut <- intersect(features[[1]], features[[7]])
+
+#Using the paste function
+ brfinal <- paste("Comparing", i, "with", j, "matches =", length(br), sep = ' ')
 ```
 
 
