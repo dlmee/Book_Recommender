@@ -1,0 +1,112 @@
+---
+title: "Book Recommender"
+output: html_notebook
+---
+
+### Initial Exploration of Data
+
+```{r}
+library(reshape2)
+library(dplyr)
+setwd("/home/dlmee/Info523/Book_Recommender")
+getwd()
+result <- read.csv(file = "Books.csv")
+ratings <- read.csv(file = "Ratings.csv")
+#reviews <- read.csv(file = "Users.csv") I don't think we'll end up using this. 
+
+search <- ratings[ratings$Book.Rating != '0',]
+
+#Get rid of rows that occur less than 60 times. This is making sure that we're only getting reviewers who consistently review. 
+df2 <- search %>%
+  group_by(User.ID) %>%
+  filter(n() >= 60)
+
+# Find everyone who rates at least one a ten, make it distinct
+df3 <- df2 %>%
+  filter(grepl('10', Book.Rating)) %>%
+  distinct(User.ID, .keep_all = TRUE)
+
+# Find users who rated at least 4 books a 10
+features <- df3 %>%
+  group_by(ISBN) %>%
+  filter(n() >= 4) %>%
+  distinct(ISBN, .keep_all = TRUE)
+
+superusers <- pull(features, User.ID)
+superbooks <- pull(features, ISBN)
+
+# Just in case we're curious
+curious <- result[result$ISBN %in% superbooks,]
+
+#Now to build the features function. 
+telist <- list()
+telist <- c(telist, list(superusers))
+telist <- c(telist, list(superbooks))
+teunlist <- unlist(telist, recursive = TRUE)
+
+featselect <- function(superusers, ratings){
+  features <- list()
+  for (super in superusers){
+    step <- ratings %>%
+      filter(grepl(super, User.ID))
+    feature <- list()
+    for (row in 1:nrow(step)){
+      allusers <- ratings %>%
+        filter(grepl(step[row,2], ISBN)) %>%
+        filter(grepl(step[row,3], Book.Rating)) %>%
+        pull(User.ID)
+      #print(c("Finished a run:", row, length(allusers)))
+      feature <- c(feature, list(allusers))
+    }
+  feature <- unlist(feature, recursive = TRUE)
+  feature <- unique(feature)
+  print(c("finished a feature:", length(feature)))
+  features <- c(features, list(feature))
+  }
+  return (features)
+}
+
+tester <- featselect(superusers[2:3], search)
+
+#Let's see how much these two intersect, I'm pretty happy with this. 85 overlap between collectively 1600 in a pair, fairly distinct.
+#If we wanted we could remove these users...I'll leave them for now. 
+tester2 <- intersect(tester[[1]], tester[[2]])
+
+#Now with these lists of users, we simply need to go one step further, and add their scores to a row, so we have pairs of ISBN and cumulative scores. These will be one step prior to our true features
+for (i in 1:10){
+  print(i)
+}
+
+#Take only ISBN and then add 9 columns, one for each feature. 
+level2 <- result %>%
+  select(ISBN) %>%
+  mutate(
+    currentfeat = 0
+  )
+
+level2['currentfeat'][level2['ISBN'] == '0195153448'] <- 24
+find <- level2[level2$ISBN == '0195153448',] %>%
+  pull(currentfeat)
+
+#level2 <- t(level2)
+#level2[1][1]  <- 1 
+draw <- search %>%
+    filter(User.ID %in% tester[[1]])
+
+for (row in 1:nrow(draw)){
+  cbook <- draw[row,2]
+  cscore <-draw[row,3]
+  original <- level2[level2$ISBN == cbook,] %>%
+    pull(currentfeat)
+  level2['currentfeat'][level2['ISBN'] == cbook] <- cscore + original
+  }
+
+write.csv(level2, file = "initial.csv")
+
+#Finally we need to apply this to USER and ITEM, such that every user has each feature score, and every item has each feature score. This will be our true feature matrix.
+
+
+
+```
+
+
