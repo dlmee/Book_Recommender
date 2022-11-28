@@ -98,28 +98,74 @@ items <- result %>%
 feat2item <- function(features, items, ratings){
   for (i in seq_along(features)){
     title <- paste("feature", i, sep = '')
-    items <- items %>%
-      mutate(
-        title = 1
-      )
+    items[[title]] <- 1
   draw <- ratings %>%
-    filter(User.ID %in% feature[[i]])
+    filter(User.ID %in% features[[i]])
   for (row in 1:nrow(draw)){
   cbook <- draw[row,2]
   cscore <-draw[row,3]
-  original <- level2[level2$ISBN == cbook,] %>%
+  original <- items[items$ISBN == cbook,] %>%
     pull(title)
-  level2[title][level2['ISBN'] == cbook] <- cscore + original
+  items[title][items['ISBN'] == cbook] <- cscore + original
     }
   }
   return (items)
 }
 
-write.csv(itemfeatures, file = "itemfeatures.csv")
+itemfeatures <- feat2item(features, items, search)
 
+#write.csv(itemfeatures, file = "itemfeatures.csv")
 
+#Now to build feat2user. Just like with above, I need to create a user dataframe with a single column. 
 
+users <- ratings %>%
+  distinct(User.ID) %>%
+  select(User.ID)
 
+#a little helper function for the comparison. 
+all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) # Found this code snippet on rdocumentation.org, awesome! Thanks!
+
+#Interestingly whereas with feat2item we went column, by column, here it's going to be row by row. We treat a user entirely, then move on. How interesting!
+
+feat2user <- function(features, users, ratings){
+  for (i in seq_along(features)){
+    title <- paste("feature", i, sep = '')
+    users[[title]] <- .001
+  }
+  # For user
+  for (row in 1:nrow(users)){
+    #Grab that users reviews
+    interest <- ratings %>%
+      filter(User.ID == users[row,1])
+    
+    for (i in seq_along(features)){
+      #iterate through feature
+      #Remove current user from feature if present
+      cfeat <- features[[i]] 
+      cfeat <- cfeat[cfeat != users[row,1]]
+      
+      #Select all ratings from those users.
+      supint <- ratings %>%
+        filter(User.ID %in% cfeat)
+      
+      #Intersect those by book title then multiply by rating
+      relationship <- inner_join(interest, supint, by = "ISBN") 
+      if (dim(relationship)[1] != 0){
+        users[row, i+1] <- all.eqNum(relationship$Book.Rating.x, relationship$Book.Rating.y)
+      }
+      
+      #Take that result and add as the feature value to the user.
+      }
+    }
+  # For feature
+  # Compare user against feature (i.e. superuser)
+  # How similar are the ratings between the user and the superuser. 
+  return (users)
+}
+
+sampler <- users %>%
+  slice_sample(n =5)
+nusers <- feat2user(features, sampler, search)
 
 #Finally we need to apply this to USER and ITEM, such that every user has each feature score, and every item has each feature score. This will be our true feature matrix.
 
@@ -159,7 +205,17 @@ These are some aspects of R that I needed to understand in order to succeed on t
   
 #Using the intersect function
   crosscut <- intersect(features[[1]], features[[7]])
-
+  
+  dft1 <- ratings %>%
+    slice_sample(n = 10)
+  dft2 <- ratings %>%
+    slice_sample(n = 10)
+  ccdf <- inner_join(dft1, dft2, by = "ISBN") %>%
+    filter(Book.Rating.x == Book.Rating.y)
+    
+  mdif <- all.equal.numeric(ccdf$Book.Rating.x, ccdf$Book.Rating.y)
+  all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) # Found this code snippet on rdocumentation.org, awesome! Thanks!
+  mdif <- all.eqNum(ccdf$Book.Rating.x, ccdf$Book.Rating.y)
 #Using the paste function
  brfinal <- paste("Comparing", i, "with", j, "matches =", length(br), sep = ' ')
 ```
