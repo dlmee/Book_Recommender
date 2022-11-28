@@ -68,7 +68,7 @@ featselect <- function(superusers, ratings){
 features <- featselect(superusers, search)
 
 # Let's write that to a csv
-capture.output(features, file = "features.csv")
+#capture.output(features, file = "features.csv")
 
 
 #Let's see how much these two intersect, I'm pretty happy with this. 85 overlap between collectively 1600 in a pair, fairly distinct.
@@ -112,7 +112,9 @@ feat2item <- function(features, items, ratings){
   return (items)
 }
 
-itemfeatures <- feat2item(features, items, search)
+itsampler <- items %>%
+  slice_sample(n =500)
+itemfeatures <- feat2item(features, itsampler, search)
 
 #write.csv(itemfeatures, file = "itemfeatures.csv")
 
@@ -130,7 +132,7 @@ all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) # Found th
 feat2user <- function(features, users, ratings){
   for (i in seq_along(features)){
     title <- paste("feature", i, sep = '')
-    users[[title]] <- .001
+    users[[title]] <- .1
   }
   # For user
   for (row in 1:nrow(users)){
@@ -150,13 +152,17 @@ feat2user <- function(features, users, ratings){
       
       #Intersect those by book title then multiply by rating
       relationship <- inner_join(interest, supint, by = "ISBN") 
+      #Take that result and add as the feature value to the user. If there is any intersection at all!
       if (dim(relationship)[1] != 0){
-        users[row, i+1] <- all.eqNum(relationship$Book.Rating.x, relationship$Book.Rating.y)
+        if (all.equal(relationship$Book.Rating.x, relationship$Book.Rating.y) == TRUE){
+          users[row, i+1] <- 1
+        } else {
+          users[row, i+1] <- all.eqNum(relationship$Book.Rating.x, relationship$Book.Rating.y)
       }
       
-      #Take that result and add as the feature value to the user.
       }
     }
+  }
   # For feature
   # Compare user against feature (i.e. superuser)
   # How similar are the ratings between the user and the superuser. 
@@ -164,7 +170,7 @@ feat2user <- function(features, users, ratings){
 }
 
 sampler <- users %>%
-  slice_sample(n =5)
+  slice_sample(n =500)
 nusers <- feat2user(features, sampler, search)
 
 #Finally we need to apply this to USER and ITEM, such that every user has each feature score, and every item has each feature score. This will be our true feature matrix.
@@ -174,6 +180,7 @@ nusers <- feat2user(features, sampler, search)
 ```
 ### Practice
 These are some aspects of R that I needed to understand in order to succeed on this project
+
 ```{r}
 # lists
 
@@ -215,9 +222,9 @@ These are some aspects of R that I needed to understand in order to succeed on t
     
   mdif <- all.equal.numeric(ccdf$Book.Rating.x, ccdf$Book.Rating.y)
   all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) # Found this code snippet on rdocumentation.org, awesome! Thanks!
-  mdif <- all.eqNum(ccdf$Book.Rating.x, ccdf$Book.Rating.y)
+  mdif <- all.equal(c(1,2,2), c(1,2,2))
 #Using the paste function
  brfinal <- paste("Comparing", i, "with", j, "matches =", length(br), sep = ' ')
-```
 
+```
 
