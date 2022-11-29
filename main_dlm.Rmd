@@ -185,30 +185,51 @@ dfp3 <- matrix(sample(0:5, replace = TRUE), nrow=5, ncol=4)
 dfp3[dfp3 == 0] <- NA
 round(rnorm(10),4)
 
+
+#Troubleshooting
+featcount <- ncol(dfp3)
+P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=nrow(dfp3), ncol=ncol(dfp3))
+Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=ncol(dfp3), ncol=nrow(dfp3))
+P[1,] %*% Q[,1]
+dfp3[1,1]
+loss <- dfp3[1,1] - P[1,] %*% Q[,1]
+loss <- loss[1,1]
+P[1,1] <- P[1,1] + .001 * (2 * 3.65 * Q[1,1] - .02 * P[1,1])
+set.seed(9)
+if (dfp3[1,1]>0){
+  print("hello")
+}
+featcount <- ncol(dfp3)
+featcount <- 1:featcount
+
+
 # Now use Matrix Factorization to fill in missing scores. 
 factorization <- function(tbf, steps, alpha, beta){
-  featcount <- ncol(tbf)
+  featcount <- ncol(tbf) #Here's my problem! I'm looping through a single value. 
   P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=nrow(tbf), ncol=ncol(tbf))
   Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=ncol(tbf), ncol=nrow(tbf))
-  for (step in steps){
-    for (i in nrow(tbf)){
-      for (j in ncol(tbf)){
-        if(!is.na(tbf[i,j])){
+  counter <- 0
+  for (step in 1:steps){
+    for (i in 1:nrow(tbf)){
+      for (j in 1:ncol(tbf)){
+        if(tbf[i,j] > 0){
           #grab both values as vectors
           loss <- tbf[i,j] - P[i,] %*% Q[,j]
-          for (feat in featcount){ #update our two tables. 
-            P[i,feat] = P[i,feat] + alpha * (2 * loss * Q[feat,j] - beta * P[i,feat]) #Something not working here. I'll finish this tomorrow. then be done!
-            Q[feat,j] = Q[feat,j] + alpha * (2 * loss * P[i,feat] - beta * Q[feat,j])
+          loss <- loss[1,1]
+          for (feat in 1:featcount){ #update our two tables. 
+            counter <- counter +1
+            P[i,feat] <- P[i,feat] + alpha * (2 * loss * Q[feat,j] - beta * P[i,feat]) #Something not working here. I'll finish this tomorrow. then be done!
+            Q[feat,j] <- Q[feat,j] + alpha * (2 * loss * P[i,feat] - beta * Q[feat,j])
           }
         }
       }
     }
   }
-  answer <- list(P,Q)
-  return (answer)
+  print(counter)
+  return (P %*% Q)
 }
 
-factored <- factorization(dfp3, 50, .001, .02)
+factored <- factorization(dfp3, 1000, .001, .02)
 
 #And finally make a recommendation based on the interaction between a user and the books
 ns <- melt(sampler, id.vars = 1) %>%
