@@ -175,4 +175,37 @@ factorization <- function(tbf, steps, alpha, beta){
     mutate(saved, .before = 1)
   return (list(P,Q))
 }
+
+
+
+
+factorization <- function(tbf, steps, alpha, beta, featcount){
+  P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=nrow(tbf), ncol=featcount)
+  Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=ncol(tbf), ncol=featcount)
+  Q <-t(Q)
+  counter <- 0
+  for (step in 1:steps){
+    for (i in 1:nrow(tbf)){
+      for (j in 1:ncol(tbf)){
+        if(tbf[i,j] > 0){
+          #grab both values as vectors
+          loss <- tbf[i,j] - P[i,] %*% Q[,j]
+          loss <- loss[1,1]
+          for (feat in 1:featcount){ #update our two tables. 
+            counter <- counter +1
+            P[i,feat] <- P[i,feat] + alpha * (2 * loss * Q[feat,j] - beta * P[i,feat]) #Something not working here. I'll finish this tomorrow. then be done!
+            Q[feat,j] <- Q[feat,j] + alpha * (2 * loss * P[i,feat] - beta * Q[feat,j])
+          }
+        }
+      }
+    }
+  }
+  print(counter)
+  return (P %*% Q)
+}
+
+
+ns <- melt(sampler, id.vars = 1) %>%
+  select(value)
+
 ```

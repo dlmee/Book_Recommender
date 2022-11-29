@@ -1,6 +1,8 @@
 ---
 title: "Book Recommender"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ### Initial Exploration of Data
@@ -9,10 +11,8 @@ output: html_notebook
 library(reshape2)
 library(dplyr)
 setwd("/home/dlmee/Info523/Book_Recommender")
-getwd()
 result <- read.csv(file = "Books.csv")
 ratings <- read.csv(file = "Ratings.csv")
-#reviews <- read.csv(file = "Users.csv") I don't think we'll end up using this. 
 
 search <- ratings[ratings$Book.Rating != '0',]
 
@@ -62,10 +62,13 @@ featselect <- function(superusers, ratings){
   return (features)
 }
 
-#features <- featselect(superusers, search)
+features <- featselect(superusers, search)
+
+features[[1]]
 
 # Let's write that to a csv
 #capture.output(features, file = "features.csv")
+
 
 #Let's see how much these two intersect, I'm pretty happy with this. 85 overlap between collectively 1600 in a pair, fairly distinct.
 #If we wanted we could remove these users...I'll leave them for now. 
@@ -110,15 +113,20 @@ feat2item <- function(features, items, ratings){
 
 
 #itemfeatures <- feat2item(features, itsampler, search)
-
 #write.csv(itemfeatures, file = "itemfeatures.csv")
-itemfeatures <- read.csv("itemfeatures.csv")
 
+itemfeatures <- read.csv("itemfeatures.csv")
 itemfeatures[itemfeatures == 1] <- NA
+
 itsampler <- itemfeatures %>%
   slice_sample(n =500)
 itsampler <- itsampler[-1]
+itsampler[is.na(itsampler)] = 0
 #itsampler <- mutate_if(itsampler, is.numeric & , ~ . / 10)
+
+slice_head(itsampler, n = 20)
+
+
 #Now to build feat2user. Just like with above, I need to create a user dataframe with a single column. 
 
 users <- ratings %>%
@@ -126,7 +134,8 @@ users <- ratings %>%
   select(User.ID)
 
 #a little helper function for the comparison. 
-all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) # Found this code snippet on rdocumentation.org, awesome! Thanks!
+#all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) 
+# Found the above code snippet on rdocumentation.org, awesome! Thanks!
 
 #Interestingly whereas with feat2item we went column, by column, here it's going to be row by row. We treat a user entirely, then move on. How interesting!
 
@@ -170,8 +179,6 @@ feat2user <- function(features, users, ratings){
   return (users)
 }
 
-sampler <- users %>%
-  slice_sample(n =5000)
 #users <- feat2user(features, sampler, search)
 #write.csv(users, file = "userfeatures.csv")
 
@@ -184,10 +191,10 @@ sampler <- sampler[-1]
 sampler <- mutate_if(sampler, is.numeric, ~ . * 100)
 sampler[is.na(sampler)] = 0
 
-# Now use Matrix Factorization to fill in missing scores. 
+slice_head(sampler, n = 20)
 
-dfp3 <- matrix(sample(0:5, replace = TRUE), nrow=7, ncol=6)
-featcount <- ncol(tbf)
+
+# Now use Matrix Factorization to fill in missing scores. 
 
 factorization <- function(tbf, steps, alpha, beta, featcount){
   saved <- tbf[1]
@@ -220,15 +227,15 @@ factorization <- function(tbf, steps, alpha, beta, featcount){
   return (answer)
 }
 
-factored2 <- factorization(sampler, 500, .0001, .002, 9)
+factored <- factorization(sampler, 500, .0001, .002, 9)
 
-nf <- factorization(dfp3, 500, .001, .02)
+slice_head(factored, n = 20)
+
 ifactored <-factorization(itsampler, 1000, .001, .02, 9)
+
+slice_head(factored, n = 20)
+
 #And finally make a recommendation based on the interaction between a user and the books
-
-ns <- melt(sampler, id.vars = 1) %>%
-  select(value)
-
 
 recommender <- function(target, users, items){
   tfeature <- users %>%
@@ -250,13 +257,21 @@ recommender <- function(target, users, items){
   return (r_matrix)
 }
 
-recommendation <- recommender('236146', factored, ifactored)
+#Need to make the user queried a random user from the known sample in factored. 
+sampleuser <- factored %>%
+  slice_sample(n = 1) %>%
+  pull(User.ID)
+  
+
+recommendation <- recommender(sampleuser, factored, ifactored)
 books <- recommendation %>%
   arrange(target) %>%
   slice_tail(n =10) %>%
   pull(ISBN)
 
+#Let's just take a look at the top ten recommendations
 curious <- result[result$ISBN %in% books,]
+curious$Book.Title
 
 ```
 
