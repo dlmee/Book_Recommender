@@ -72,3 +72,107 @@ for (feat in featlist){
     users <- append(users, allusers$)
   }
 }
+
+### Practice
+These are some aspects of R that I needed to understand in order to succeed on this project
+
+```{r}
+# lists
+
+#This is just to practice with lists a bit
+telist <- list()
+telist <- c(telist, list(superusers))
+telist <- c(telist, list(superbooks))
+teunlist <- unlist(telist, recursive = TRUE)
+
+# Modifying elements of a dataframe
+
+level2['currentfeat'][level2['ISBN'] == '0195153448'] <- 24
+find <- level2[level2$ISBN == '0195153448',] %>%
+  pull(currentfeat)
+
+#Interacting with pipes and dplyr
+
+# An example of select and mutate
+items <- result %>%
+  select(ISBN) %>%
+  mutate(
+    currentfeat = 0
+  )
+
+
+#An exmaple of filter and %in%
+draw <- search %>%
+  filter(User.ID %in% tester[[1]])
+
+#Using the intersect function
+crosscut <- intersect(features[[1]], features[[7]])
+
+dft1 <- ratings %>%
+  slice_sample(n = 10)
+dft2 <- ratings %>%
+  slice_sample(n = 10)
+ccdf <- inner_join(dft1, dft2, by = "ISBN") %>%
+  filter(Book.Rating.x == Book.Rating.y)
+
+mdif <- all.equal.numeric(ccdf$Book.Rating.x, ccdf$Book.Rating.y)
+all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) # Found this code snippet on rdocumentation.org, awesome! Thanks!
+mdif <- all.equal(c(1,2,2), c(1,2,2))
+#Using the paste function
+brfinal <- paste("Comparing", i, "with", j, "matches =", length(br), sep = ' ')
+
+
+dfp1 <- matrix(1:20, nrow=5, ncol=4)
+practice2 <- c(1,2,3,4)
+dfp2 <- dfp1 %*% practice2
+
+dfp3 <- matrix(sample(0:5, replace = TRUE), nrow=5, ncol=4)
+dfp3[dfp3 == 0] <- NA
+round(rnorm(10),4)
+
+#Troubleshooting
+
+saved <- sampler[1]
+sampler <- sampler[-1]
+msamp <- data.matrix(sampler) 
+class(msamp)
+answer <- as.data.frame(msamp) %>%
+  mutate(saved, .before = 1)
+
+itemfeatures[itemfeatures == '1'] <- NA
+itemfeatures <- itemfeatures[-1]
+itemfeatures <- na.omit(itemfeatures)
+
+factorization <- function(tbf, steps, alpha, beta){
+  #tbf: to be factored
+  featcount <- ncol(tbf) - 1 
+  print(c("featcount", featcount))
+  saved <- tbf[1]
+  tbf <- tbf[-1]
+  tbf <- data.matrix(tbf)
+  P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=5, ncol=4)
+  Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=4, ncol=5)
+  counter <- 0
+  for (step in 1:steps){
+    for (i in 1:nrow(tbf)){
+      for (j in 1:ncol(tbf)){
+        if(tbf[i,j] > 0){
+          #grab both values as vectors
+          loss <- tbf[i,j] - P[i,] %*% Q[,j]
+          loss <- loss[1,1]
+          for (feat in 1:featcount){ #update our two tables. 
+            counter <- counter +1
+            P[i,feat] <- P[i,feat] + alpha * (2 * loss * Q[feat,j] - beta * P[i,feat]) 
+            Q[feat,j] <- Q[feat,j] + alpha * (2 * loss * P[i,feat] - beta * Q[feat,j])
+          }
+        }
+      }
+    }
+  }
+  print(counter)
+  reconstituted <- P %*% Q
+  answer <- as.data.frame(reconstituted) %>%
+    mutate(saved, .before = 1)
+  return (list(P,Q))
+}
+```

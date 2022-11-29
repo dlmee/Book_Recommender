@@ -39,9 +39,6 @@ superbooks <- pull(features, ISBN)
 curious <- result[result$ISBN %in% superbooks,]
 
 
-
-
-
 #Now to build the features function. 
 featselect <- function(superusers, ratings){
   features <- list()
@@ -65,11 +62,10 @@ featselect <- function(superusers, ratings){
   return (features)
 }
 
-features <- featselect(superusers, search)
+#features <- featselect(superusers, search)
 
 # Let's write that to a csv
 #capture.output(features, file = "features.csv")
-
 
 #Let's see how much these two intersect, I'm pretty happy with this. 85 overlap between collectively 1600 in a pair, fairly distinct.
 #If we wanted we could remove these users...I'll leave them for now. 
@@ -112,13 +108,17 @@ feat2item <- function(features, items, ratings){
   return (items)
 }
 
-itsampler <- items %>%
-  slice_sample(n =500)
-itemfeatures <- feat2item(features, itsampler, search)
+
+#itemfeatures <- feat2item(features, itsampler, search)
 
 #write.csv(itemfeatures, file = "itemfeatures.csv")
 itemfeatures <- read.csv("itemfeatures.csv")
 
+itemfeatures[itemfeatures == 1] <- NA
+itsampler <- itemfeatures %>%
+  slice_sample(n =500)
+itsampler <- itsampler[-1]
+#itsampler <- mutate_if(itsampler, is.numeric & , ~ . / 10)
 #Now to build feat2user. Just like with above, I need to create a user dataframe with a single column. 
 
 users <- ratings %>%
@@ -172,42 +172,30 @@ feat2user <- function(features, users, ratings){
 
 sampler <- users %>%
   slice_sample(n =5000)
-users <- feat2user(features, sampler, search)
+#users <- feat2user(features, sampler, search)
 #write.csv(users, file = "userfeatures.csv")
 
-users[users < .11] <- NA
+userfeatures <- read.csv("userfeatures.csv")
+userfeatures[userfeatures < .11] <- NA
 
-dfp1 <- matrix(1:20, nrow=5, ncol=4)
-practice2 <- c(1,2,3,4)
-dfp2 <- dfp1 %*% practice2
-
-dfp3 <- matrix(sample(0:5, replace = TRUE), nrow=5, ncol=4)
-dfp3[dfp3 == 0] <- NA
-round(rnorm(10),4)
-
-
-#Troubleshooting
-featcount <- ncol(dfp3)
-P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=nrow(dfp3), ncol=ncol(dfp3))
-Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=ncol(dfp3), ncol=nrow(dfp3))
-P[1,] %*% Q[,1]
-dfp3[1,1]
-loss <- dfp3[1,1] - P[1,] %*% Q[,1]
-loss <- loss[1,1]
-P[1,1] <- P[1,1] + .001 * (2 * 3.65 * Q[1,1] - .02 * P[1,1])
-set.seed(9)
-if (dfp3[1,1]>0){
-  print("hello")
-}
-featcount <- ncol(dfp3)
-featcount <- 1:featcount
-
+sampler <- userfeatures %>%
+  slice_sample(n =500)
+sampler <- sampler[-1]
+sampler <- mutate_if(sampler, is.numeric, ~ . * 100)
+sampler[is.na(sampler)] = 0
 
 # Now use Matrix Factorization to fill in missing scores. 
-factorization <- function(tbf, steps, alpha, beta){
-  featcount <- ncol(tbf) #Here's my problem! I'm looping through a single value. 
-  P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=nrow(tbf), ncol=ncol(tbf))
-  Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=ncol(tbf), ncol=nrow(tbf))
+
+dfp3 <- matrix(sample(0:5, replace = TRUE), nrow=7, ncol=6)
+featcount <- ncol(tbf)
+
+factorization <- function(tbf, steps, alpha, beta, featcount){
+  saved <- tbf[1]
+  tbf <- tbf[-1]
+  tbf <- data.matrix(tbf)
+  P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=nrow(tbf), ncol=featcount)
+  Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=ncol(tbf), ncol=featcount)
+  Q <-t(Q)
   counter <- 0
   for (step in 1:steps){
     for (i in 1:nrow(tbf)){
@@ -226,19 +214,21 @@ factorization <- function(tbf, steps, alpha, beta){
     }
   }
   print(counter)
-  return (P %*% Q)
+  reconstituted <- P %*% Q
+  answer <- as.data.frame(reconstituted) %>%
+    mutate(saved, .before = 1)
+  return (answer)
 }
 
-factored <- factorization(dfp3, 1000, .001, .02)
+factored2 <- factorization(sampler, 500, .0001, .002, 9)
 
+nf <- factorization(dfp3, 500, .001, .02)
+ifactored <-factorization(itsampler, 1000, .001, .02, 9)
 #And finally make a recommendation based on the interaction between a user and the books
+
 ns <- melt(sampler, id.vars = 1) %>%
   select(value)
 
-
-itemfeatures[itemfeatures == '1'] <- NA
-itemfeatures <- itemfeatures[-1]
-itemfeatures <- na.omit(itemfeatures)
 
 recommender <- function(target, users, items){
   tfeature <- users %>%
@@ -260,7 +250,7 @@ recommender <- function(target, users, items){
   return (r_matrix)
 }
 
-recommendation <- recommender('236146', users, itemfeatures)
+recommendation <- recommender('236146', factored, ifactored)
 books <- recommendation %>%
   arrange(target) %>%
   slice_tail(n =10) %>%
@@ -269,53 +259,5 @@ books <- recommendation %>%
 curious <- result[result$ISBN %in% books,]
 
 ```
-### Practice
-These are some aspects of R that I needed to understand in order to succeed on this project
 
-```{r}
-# lists
-
-#This is just to practice with lists a bit
-  telist <- list()
-  telist <- c(telist, list(superusers))
-  telist <- c(telist, list(superbooks))
-  teunlist <- unlist(telist, recursive = TRUE)
-
-# Modifying elements of a dataframe
-
-  level2['currentfeat'][level2['ISBN'] == '0195153448'] <- 24
-  find <- level2[level2$ISBN == '0195153448',] %>%
-    pull(currentfeat)
-
-#Interacting with pipes and dplyr
-
-  # An example of select and mutate
-  items <- result %>%
-    select(ISBN) %>%
-    mutate(
-      currentfeat = 0
-    )
-
-
-  #An exmaple of filter and %in%
-  draw <- search %>%
-      filter(User.ID %in% tester[[1]])
-  
-#Using the intersect function
-  crosscut <- intersect(features[[1]], features[[7]])
-  
-  dft1 <- ratings %>%
-    slice_sample(n = 10)
-  dft2 <- ratings %>%
-    slice_sample(n = 10)
-  ccdf <- inner_join(dft1, dft2, by = "ISBN") %>%
-    filter(Book.Rating.x == Book.Rating.y)
-    
-  mdif <- all.equal.numeric(ccdf$Book.Rating.x, ccdf$Book.Rating.y)
-  all.eqNum <- function(x,y) as.numeric(sub(".*:", '', all.equal(x,y))) # Found this code snippet on rdocumentation.org, awesome! Thanks!
-  mdif <- all.equal(c(1,2,2), c(1,2,2))
-#Using the paste function
- brfinal <- paste("Comparing", i, "with", j, "matches =", length(br), sep = ' ')
-
-```
 
