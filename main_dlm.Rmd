@@ -117,6 +117,7 @@ itsampler <- items %>%
 itemfeatures <- feat2item(features, itsampler, search)
 
 #write.csv(itemfeatures, file = "itemfeatures.csv")
+itemfeatures <- read.csv("itemfeatures.csv")
 
 #Now to build feat2user. Just like with above, I need to create a user dataframe with a single column. 
 
@@ -170,12 +171,41 @@ feat2user <- function(features, users, ratings){
 }
 
 sampler <- users %>%
-  slice_sample(n =500)
-nusers <- feat2user(features, sampler, search)
+  slice_sample(n =1)
+users <- feat2user(features, sampler, search)
+#write.csv(users, file = "userfeatures.csv")
 
-#Finally we need to apply this to USER and ITEM, such that every user has each feature score, and every item has each feature score. This will be our true feature matrix.
+# Now use Matrix Factorization to fill in missing scores. 
 
+ns <- melt(sampler, id.vars = 1) %>%
+  select(value)
+#And finally make a recommendation based on the interaction between a user and the books
 
+itemfeatures[itemfeatures == '1'] <- NA
+itemfeatures <- itemfeatures[-1]
+itemfeatures <- na.omit(itemfeatures)
+
+recommender <- function(target, users, items){
+  tfeature <- users %>%
+    filter(User.ID == target) %>%
+    melt(id.vars = 1) %>%
+    pull(value)
+  print(tfeature)
+  r_matrix <- items %>%
+    select(ISBN) %>%
+    mutate(target = 0)
+  for (row in 1:nrow(items)){
+    rfeat <- items %>%
+      slice(row) %>%
+      melt(id.vars = 1) %>%
+      pull(value)
+    rfeat <- as.numeric(rfeat)
+    r_matrix[row,2] <- tfeature %*% rfeat
+  }  
+  return (r_matrix)
+}
+
+recommendation <- recommender('17012', users, itemfeatures)
 
 ```
 ### Practice
