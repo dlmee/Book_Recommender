@@ -171,15 +171,49 @@ feat2user <- function(features, users, ratings){
 }
 
 sampler <- users %>%
-  slice_sample(n =1)
+  slice_sample(n =5000)
 users <- feat2user(features, sampler, search)
 #write.csv(users, file = "userfeatures.csv")
 
-# Now use Matrix Factorization to fill in missing scores. 
+users[users < .11] <- NA
 
+dfp1 <- matrix(1:20, nrow=5, ncol=4)
+practice2 <- c(1,2,3,4)
+dfp2 <- dfp1 %*% practice2
+
+dfp3 <- matrix(sample(0:5, replace = TRUE), nrow=5, ncol=4)
+dfp3[dfp3 == 0] <- NA
+round(rnorm(10),4)
+
+# Now use Matrix Factorization to fill in missing scores. 
+factorization <- function(tbf, steps, alpha, beta){
+  featcount <- ncol(tbf)
+  P <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=nrow(tbf), ncol=ncol(tbf))
+  Q <- matrix(sample(1:featcount, replace = TRUE)/10, nrow=ncol(tbf), ncol=nrow(tbf))
+  for (step in steps){
+    for (i in nrow(tbf)){
+      for (j in ncol(tbf)){
+        if(!is.na(tbf[i,j])){
+          #grab both values as vectors
+          loss <- tbf[i,j] - P[i,] %*% Q[,j]
+          for (feat in featcount){ #update our two tables. 
+            P[i,feat] = P[i,feat] + alpha * (2 * loss * Q[feat,j] - beta * P[i,feat]) #Something not working here. I'll finish this tomorrow. then be done!
+            Q[feat,j] = Q[feat,j] + alpha * (2 * loss * P[i,feat] - beta * Q[feat,j])
+          }
+        }
+      }
+    }
+  }
+  answer <- list(P,Q)
+  return (answer)
+}
+
+factored <- factorization(dfp3, 50, .001, .02)
+
+#And finally make a recommendation based on the interaction between a user and the books
 ns <- melt(sampler, id.vars = 1) %>%
   select(value)
-#And finally make a recommendation based on the interaction between a user and the books
+
 
 itemfeatures[itemfeatures == '1'] <- NA
 itemfeatures <- itemfeatures[-1]
@@ -205,7 +239,13 @@ recommender <- function(target, users, items){
   return (r_matrix)
 }
 
-recommendation <- recommender('17012', users, itemfeatures)
+recommendation <- recommender('236146', users, itemfeatures)
+books <- recommendation %>%
+  arrange(target) %>%
+  slice_tail(n =10) %>%
+  pull(ISBN)
+
+curious <- result[result$ISBN %in% books,]
 
 ```
 ### Practice
